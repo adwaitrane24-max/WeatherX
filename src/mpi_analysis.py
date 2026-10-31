@@ -167,7 +167,117 @@ def analyze_parallel(
     )
 
 
-    # Member 3 can continue local calculations here.
+    # Member 3: Calculate local statistics
+
+    local_temperature_sum = sum(
+        record["temperature"] for record in local_records
+    )
+
+    local_temperature_count = len(local_records)
+
+    local_min_temperature = min(
+        (record["temperature"] for record in local_records),
+        default=float("inf")
+    )
+
+    local_max_temperature = max(
+        (record["temperature"] for record in local_records),
+        default=float("-inf")
+    )
+
+    local_humidity_sum = sum(
+        record["humidity"] for record in local_records
+    )
+
+    local_rainfall_sum = sum(
+        record["rainfall"] for record in local_records
+    )
+
+    local_extreme_count = sum(
+        1 for record in local_records
+        if record["temperature"] > extreme_threshold
+    )
+
+    print(f"\nRank {rank} Local Statistics:")
+    print(f"Temperature Sum: {local_temperature_sum}")
+    print(f"Temperature Count: {local_temperature_count}")
+    print(f"Minimum Temperature: {local_min_temperature}")
+    print(f"Maximum Temperature: {local_max_temperature}")
+    print(f"Humidity Sum: {local_humidity_sum}")
+    print(f"Rainfall Sum: {local_rainfall_sum}")
+    print(f"Extreme Temperature Count: {local_extreme_count}")
+
+    # Member 3: Combine local statistics using MPI Reduce
+
+    global_temperature_sum = comm.reduce(
+        local_temperature_sum, op=MPI.SUM, root=0
+    )
+
+    global_temperature_count = comm.reduce(
+        local_temperature_count, op=MPI.SUM, root=0
+    )
+
+    global_min_temperature = comm.reduce(
+        local_min_temperature, op=MPI.MIN, root=0
+    )
+
+    global_max_temperature = comm.reduce(
+        local_max_temperature, op=MPI.MAX, root=0
+    )
+
+    global_humidity_sum = comm.reduce(
+        local_humidity_sum, op=MPI.SUM, root=0
+    )
+
+    global_rainfall_sum = comm.reduce(
+        local_rainfall_sum, op=MPI.SUM, root=0
+    )
+
+    global_extreme_count = comm.reduce(
+        local_extreme_count, op=MPI.SUM, root=0
+    )
+
+    # Member 3: Combine statistics using MPI Allreduce
+
+    all_temperature_sum = comm.allreduce(
+        local_temperature_sum, op=MPI.SUM
+    )
+
+    # Member 3: Calculate and display global statistics
+
+    if rank == 0:
+        if global_temperature_count > 0:
+            average_temperature = (
+                global_temperature_sum / global_temperature_count
+            )
+
+            average_humidity = (
+                global_humidity_sum / global_temperature_count
+            )
+
+            display_min_temperature = global_min_temperature
+            display_max_temperature = global_max_temperature
+
+        else:
+            average_temperature = None
+            average_humidity = None
+            display_min_temperature = None
+            display_max_temperature = None
+
+        print("\n========== GLOBAL WEATHER STATISTICS ==========")
+        print(f"Total Records: {global_temperature_count}")
+        print(f"Average Temperature: {average_temperature}")
+        print(f"Minimum Temperature: {display_min_temperature}")
+        print(f"Maximum Temperature: {display_max_temperature}")
+        print(f"Average Humidity: {average_humidity}")
+        print(f"Total Rainfall: {global_rainfall_sum}")
+        print(f"Extreme Temperature Count: {global_extreme_count}")
+
+    print(
+        f"Rank {rank}: Global temperature sum using Allreduce = "
+        f"{all_temperature_sum}",
+        flush=True
+    )
 
     return local_records, extreme_threshold
 
